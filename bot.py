@@ -63,7 +63,7 @@ class ClaimView(discord.ui.View):
         save_claims(claimed_posts)
         save_collections(user_collections)
 
-        await interaction.response.send_message("✅ You claimed this post!", ephemeral=True)
+        await interaction.response.send_message("✅ You have claimed this post!", ephemeral=True)
         #self.disable_all_items()
         await interaction.message.edit(view=self)
 
@@ -130,7 +130,7 @@ class ClaimsPaginator(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != int(self.user_id):
-            await interaction.response.send_message("You can't interact with this menu.", ephemeral=True)
+            await interaction.response.send_message("You can't interact with this menu!", ephemeral=True)
             return False
         return True
 
@@ -160,6 +160,36 @@ class ClaimsPaginator(discord.ui.View):
         self.update_buttons()
         await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
 
+    @discord.ui.button(label="🗑️ Clear claim", style=discord.ButtonStyle.danger, row=1)
+    async def clear_claim(self, interaction: discord.Interaction, button: discord.ui.Button):
+        #get the claim to remove
+        claim_to_remove = self.claims[self.page]
+
+        #remove from user_collections
+        user_claims = user_collections.get(str(self.user_id), [])
+        if claim_to_remove in user_claims:
+            user_claims.remove(claim_to_remove)
+
+        #remove from claimed_posts
+        for message_id, user_id in list(claimed_posts.items()):
+            if user_id == str(self.user_id):
+                post = next((p for p in user_claims if p.get("image") == claim_to_remove.get("image")), None)
+                if post is None:
+                    claimed_posts.pop(message_id)
+
+        save_claims(claimed_posts)
+        save_collections(user_collections)
+
+        #update paginator state
+        self.claims = user_claims
+        if not self.claims:
+            await interaction.response.edit_message(content="You don't have any claims.", embed=None, view=None)
+            return
+
+        self.max_page = len(self.claims) - 1
+        self.page = min(self.page, self.max_page)
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
 
 @bot.command()
 async def danbooru(ctx, *, tag=""):
