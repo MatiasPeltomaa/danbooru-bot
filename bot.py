@@ -90,9 +90,10 @@ async def fetch_danbooru_post(tag=""):
                     image_url = post.get("file_url", "No image URL found.")
                     characters = post.get("tag_string_character", "")
                     copyrights = post.get("tag_string_copyright", "")
+                    artist = post.get("tag_string_artist", "")
                     created_at = post.get("created_at", "")
-                    return image_url, characters, copyrights, created_at
-    return None, "", "", ""
+                    return image_url, characters, copyrights, artist, created_at
+    return None, "", "", "", ""
 
 class ClaimsPaginator(discord.ui.View):
     def __init__(self, claims, user_id, timeout=120):
@@ -117,10 +118,12 @@ class ClaimsPaginator(discord.ui.View):
         date = post.get('date') or 'Unknown date'
         image_url = post.get('image') or ''
         source = escape_markdown(post.get('source') or 'Unknown')
+        artist_raw = post.get('artist') or 'Unknown'
+        artist = escape_markdown(artist_raw)
 
         embed = discord.Embed(
             title=f"Claim #{self.page+1}/{self.max_page+1}",
-            description=f"**Characters:** {characters}\n**Date:** {date}\n**Source:** {source}",
+            description=f"**Characters:** {characters}\n**Artist:** {artist}\n**Date:** {date}\n**Source:** {source}",
             color=discord.Color.blurple()
         )
         if image_url:
@@ -193,10 +196,11 @@ class ClaimsPaginator(discord.ui.View):
 
 @bot.command()
 async def danbooru(ctx, *, tag=""):
-    image_url, characters, copyrights, created_at = await fetch_danbooru_post(tag)
+    image_url, characters, copyrights, artist, created_at = await fetch_danbooru_post(tag)
     
     characters_escaped = escape_markdown(characters)
     copyrights_escaped = escape_markdown(copyrights)
+    artist_escaped = escape_markdown(artist)
 
     if not image_url:
         await ctx.send("No results found.")
@@ -209,6 +213,8 @@ async def danbooru(ctx, *, tag=""):
         embed.add_field(name="Characters", value=characters_escaped, inline=False)
     if copyrights:
         embed.add_field(name="Source", value=copyrights_escaped, inline=False)
+    if artist:
+        embed.add_field(name="Artist", value=artist_escaped, inline=False)
     if created_at:
         embed.set_footer(text=f"Posted on {created_at.split('T')[0]}")
 
@@ -219,6 +225,7 @@ async def danbooru(ctx, *, tag=""):
         "image": image_url,
         "characters": characters,
         "source": copyrights,
+        "artist": artist,
         "date": created_at.split("T")[0] if created_at else ""
     }
     await sent_msg.edit(view=ClaimView(sent_msg.id, post_info))
