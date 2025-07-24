@@ -94,6 +94,73 @@ async def fetch_danbooru_post(tag=""):
                     return image_url, characters, copyrights, created_at
     return None, "", "", ""
 
+class ClaimsPaginator(discord.ui.View):
+    def __init__(self, claims, user_id, timeout=120):
+        super().__init__(timeout=timeout)
+        self.claims = claims
+        self.user_id = user_id
+        self.page = 0
+        self.max_page = len(claims) - 1
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.first_page.disabled = self.page == 0
+        self.prev_page.disabled = self.page == 0
+        self.next_page.disabled = self.page == self.max_page
+        self.last_page.disabled = self.page == self.max_page
+
+    def get_page_embed(self):
+        post = self.claims[self.page]
+
+        characters_raw = post.get('characters') or 'Unknown'
+        characters = escape_markdown(characters_raw)
+        date = post.get('date') or 'Unknown date'
+        image_url = post.get('image') or ''
+        source = escape_markdown(post.get('source') or 'Unknown')
+
+        embed = discord.Embed(
+            title=f"Claim #{self.page+1}/{self.max_page+1}",
+            description=f"**Characters:** {characters}\n**Date:** {date}\n**Source:** {source}",
+            color=discord.Color.blurple()
+        )
+        if image_url:
+            embed.set_image(url=image_url)
+
+        return embed
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != int(self.user_id):
+            await interaction.response.send_message("You can't interact with this menu.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="<< First", style=discord.ButtonStyle.secondary)
+    async def first_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page = 0
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
+    @discord.ui.button(label="< Prev", style=discord.ButtonStyle.primary)
+    async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page > 0:
+            self.page -= 1
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
+    @discord.ui.button(label="Next >", style=discord.ButtonStyle.primary)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page < self.max_page:
+            self.page += 1
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
+    @discord.ui.button(label="Last >>", style=discord.ButtonStyle.secondary)
+    async def last_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page = self.max_page
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
+
 @bot.command()
 async def danbooru(ctx, *, tag=""):
     image_url, characters, copyrights, created_at = await fetch_danbooru_post(tag)
@@ -130,33 +197,14 @@ async def danbooru(ctx, *, tag=""):
 @bot.command()
 async def myclaims(ctx):
     user_id = str(ctx.author.id)
-    user_claims = [v for k, v in claimed_posts.items() if v == user_id]
+    claims = user_collections.get(user_id, [])
 
-    if not user_claims:
-        await ctx.send("You don't have any claimed posts.")
+    if not claims:
+        await ctx.send("You don't have any claims.")
         return
 
-    #get users claims
-    claims = user_collections.get(user_id, [])
-    lines = []
-    for i, post in enumerate(claims, 1):
-        characters_raw = post.get('characters') or 'Unknown'
-        characters = re.sub(r'([_*~`])', r'\\\1', characters_raw)
-        date = post.get('date') or 'Unknown date'
-        image_url = post.get('image') or '[No image]'
-        embed = discord.Embed(
-            title=f"Claim #{i}",
-            description=f"**Characters:** {characters}\n**Date:** {date}",
-            color=discord.Color.blue()
-        )
-        if image_url:
-            embed.set_thumbnail(url=image_url)  # Thumbnail only, not full-size
-            embed.add_field(name="Image Link", value=f"[Click to view]({image_url})", inline=False)
-
-        await ctx.send(embed=embed)
-
-    if len(claims) > 10:
-        await ctx.send(f"You have {len(claims)} total claims. Only showing the first 10.")
+    paginator = ClaimsPaginator(claims, user_id)
+    await ctx.send(embed=paginator.get_page_embed(), view=paginator)
         
 def escape_markdown(text):
     return re.sub(r'([_*~`])', r'\\\1', text or "")
