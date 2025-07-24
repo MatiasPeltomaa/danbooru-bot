@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import discord
 import aiohttp
@@ -136,7 +137,8 @@ async def myclaims(ctx):
     claims = user_collections.get(user_id, [])
     lines = []
     for i, post in enumerate(claims, 1):
-        characters = post.get('characters') or 'Unknown'
+        characters_raw = post.get('characters') or 'Unknown'
+        characters = re.sub(r'([_*~`])', r'\\\1', characters_raw)
         date = post.get('date') or 'Unknown date'
         image_url = post.get('image') or '[No image]'
         lines.append(f"**{i}.** [{characters}] - {date}\nImage: {image_url}")
