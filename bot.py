@@ -123,7 +123,7 @@ class ClaimsPaginator(discord.ui.View):
 
         embed = discord.Embed(
             title=f"Claim #{self.page+1}/{self.max_page+1}",
-            description=f"**Characters:** {characters}\n**Artist:** {artist}\n**Date:** {date}\n**Source:** {source}",
+            description=f"**Characters:** {characters}\n**Source:** {source}\n**Date:** {date}\n**Artist:** {artist}",
             color=discord.Color.blurple()
         )
         if image_url:
