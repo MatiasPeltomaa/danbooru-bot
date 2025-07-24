@@ -97,6 +97,9 @@ async def fetch_danbooru_post(tag=""):
 @bot.command()
 async def danbooru(ctx, *, tag=""):
     image_url, characters, copyrights, created_at = await fetch_danbooru_post(tag)
+    
+    characters_escaped = escape_markdown(characters)
+    copyrights_escaped = escape_markdown(copyrights)
 
     if not image_url:
         await ctx.send("No results found.")
@@ -106,9 +109,9 @@ async def danbooru(ctx, *, tag=""):
     embed = discord.Embed(title="Danbooru Post", color=discord.Color.purple())
     embed.set_image(url=image_url)
     if characters:
-        embed.add_field(name="Characters", value=characters, inline=False)
+        embed.add_field(name="Characters", value=characters_escaped, inline=False)
     if copyrights:
-        embed.add_field(name="Source", value=copyrights, inline=False)
+        embed.add_field(name="Source", value=copyrights_escaped, inline=False)
     if created_at:
         embed.set_footer(text=f"Posted on {created_at.split('T')[0]}")
 
@@ -141,11 +144,21 @@ async def myclaims(ctx):
         characters = re.sub(r'([_*~`])', r'\\\1', characters_raw)
         date = post.get('date') or 'Unknown date'
         image_url = post.get('image') or '[No image]'
-        lines.append(f"**{i}.** [{characters}] - {date}\nImage: {image_url}")
+        embed = discord.Embed(
+            title=f"Claim #{i}",
+            description=f"**Characters:** {characters}\n**Date:** {date}",
+            color=discord.Color.blue()
+        )
+        if image_url:
+            embed.set_thumbnail(url=image_url)  # Thumbnail only, not full-size
+            embed.add_field(name="Image Link", value=f"[Click to view]({image_url})", inline=False)
 
-    #send in chunks if too long
-    chunks = [lines[i:i + 5] for i in range(0, len(lines), 5)]
-    for chunk in chunks:
-        await ctx.send("\n".join(chunk))
+        await ctx.send(embed=embed)
+
+    if len(claims) > 10:
+        await ctx.send(f"You have {len(claims)} total claims. Only showing the first 10.")
+        
+def escape_markdown(text):
+    return re.sub(r'([_*~`])', r'\\\1', text or "")
 
 bot.run(TOKEN)
